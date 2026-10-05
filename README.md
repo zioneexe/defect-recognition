@@ -1,59 +1,35 @@
-# Defects
+# Shape Defect Recognition
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.1.
+Single-page Angular application using Brain.js in a Web Worker. No backend is needed.
 
-## Development server
+## Run and check
 
-To start a local development server, run:
+- `npm start` starts the local application.
+- `npm run build` creates `dist/defects/browser`.
+- `npm test -- --watch=false` runs component tests.
+- `node --test tests/processing.test.cjs` checks preprocessing, localization and real Brain.js CPU training/inference.
 
-```bash
-ng serve
-```
+## Workflow
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Select Assets, a shape, or a quality group and train. The initial dataset contains 250 generated individual images. Each shape and quality group contains Clean and Defective classes. Add Images imports any number of PNG, JPG or BMP files into the selected class; dimensions may vary. Training requires at least two images per class, reserving approximately 20% of each class (at least one) for validation. Selecting a class alone is supported for inspection and import; classification training requires a broader scope containing both classes.
 
-## Code scaffolding
+Upload one input image or load a dataset image, then choose Recognize Defects. Dataset changes invalidate the existing model. Data and models are held in memory for the session.
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Processing
 
-```bash
-ng generate component component-name
-```
+Both training and recognition resize an image to 200 × 200 pixels. Transparent areas are composited over white. The worker computes grayscale intensity as the mean of RGB divided by 255, then averages each 20 × 20 pixel cell into a 10 × 10 grid. All 100 averages feed the Brain.js sigmoid classifier in row-major order. Per-cell scaling is fitted exclusively to the training partition and reused unchanged for validation and recognition; the displayed grid always contains the original averages. GPU execution is attempted with CPU fallback. Preparation counts, completed epochs, loss, held-out accuracy, and execution times are measured.
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+For a Defective classification, localization compares the intensity grid with the nearest clean training pattern. Abnormal cells are checked by replacing their intensity with the learned clean value and measuring the reduction in the model's defective score. Adjacent suspicious cells are grouped into regions. The UI synchronizes the selected region's original-image bounding box, highlighted grid cells, coordinates, size, average intensity and anomaly score. The anomaly score measures departure from the clean pattern, not a calibrated probability. If no supporting region can be found, the UI explicitly reports localization failure. Clean results hide region-specific controls.
 
-```bash
-ng generate --help
-```
+PNG/JPG/BMP exports contain the input image with detected-region annotations. JSON contains the classification, confidence, raw intensity grid, original-image coordinates and bounding boxes, occupied cells, original image dimensions and execution time. Clean classifications export without annotations.
 
-## Building
+## Modules
 
-To build the project run:
+- `src/app/images.ts`: individual-image dataset, synthetic samples, decoding and normalization.
+- `public/engine/processing.js`: shared intensity extraction, feature vector and localization.
+- `public/engine/worker.js`: Brain.js training, validation and inference.
+- `src/app/app.ts`: application state and interaction handling.
+- `src/app/export.ts`: downloads and BMP encoding.
+- `public/engine/brain.js`: local browser distribution from the installed Brain.js dependency.
 
-```bash
-ng build
-```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
