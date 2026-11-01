@@ -1,7 +1,4 @@
-/* Brain.js 2.0.0-beta.24's browser GPU build sizes the input texture using
- * sizes[1] (the hidden layer) instead of sizes[0] (the input vector).
- * Preserve every intensity cell when the hidden layer has fewer neurons.
- */
+// Fix for brain.js 2.0.0-beta.24 GPU build: input texture was sized by the hidden layer.
 class IntensityNetworkGPU extends brain.NeuralNetworkGPU {
   buildRunInput() {
     super.buildRunInput();
