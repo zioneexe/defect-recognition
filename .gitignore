@@ -19,6 +19,7 @@ yarn-error.log
 *.launch
 .settings/
 *.sublime-workspace
+.claude/
 
 # Visual Studio Code
 .vscode/*
@@ -42,3 +43,9 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Generated and collected dataset images (~800 MB)
+/dataset
+
+# Lab reports
+/report

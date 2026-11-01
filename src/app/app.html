@@ -4,22 +4,22 @@
     @if (error) { <div class="error-banner" role="alert">{{ error }}<button (click)="error = ''" aria-label="Dismiss error">×</button></div> }
     <div class="dashboard">
       <section class="panel dataset">
-        <div class="panel-heading"><h2>Dataset Management</h2><div class="actions"><button [disabled]="busy" (click)="modal = 'shape'">Add Shape</button><button [disabled]="busy" (click)="openImport()">Add Images</button><button class="quiet" [disabled]="busy || !images.length" (click)="modal = 'clear'">Clear</button></div></div>
+        <div class="panel-heading"><h2>Dataset Management</h2><div class="actions"><button [disabled]="busy" (click)="modal = 'shape'">Add Shape</button><button [disabled]="busy" (click)="openImport()">Add Images</button>@if (folder) { <button [title]="'Open in the file manager: ' + folder" (click)="openFolder()">Open Folder</button> }<button class="quiet" [disabled]="busy || !scope.length" (click)="modal = 'clear'">Clear</button></div></div>
         <div class="tree" aria-label="Training dataset">
-          <div class="tree-row root" [class.selected]="selected === 'Assets'"><button class="expand" (click)="toggle('Assets')" aria-label="Expand assets" [attr.aria-expanded]="expanded.has('Assets')">{{ expanded.has('Assets') ? '⌄' : '›' }}</button><button class="node" (click)="select('Assets')">Assets</button><span class="tree-meta">{{ images.length }} images</span></div>
+          <div class="tree-row root" [class.selected]="selected.has('Assets')" [class.included]="included('Assets')"><button class="expand" (click)="toggle('Assets')" aria-label="Expand assets" [attr.aria-expanded]="expanded.has('Assets')">{{ expanded.has('Assets') ? '⌄' : '›' }}</button><button class="node" (click)="select('Assets', $event)" [attr.aria-pressed]="selected.has('Assets')">Assets</button><span class="tree-meta">{{ images.length }} images</span></div>
           @if (expanded.has('Assets')) {
             @for (shape of shapes; track shape) {
-              <div class="tree-row level-1" [class.selected]="selected === shape"><button class="expand" (click)="toggle(shape)" [attr.aria-label]="'Expand ' + shape" [attr.aria-expanded]="expanded.has(shape)">{{ expanded.has(shape) ? '⌄' : '›' }}</button><button class="node" (click)="select(shape)">{{ shape }}</button><span class="tree-meta">{{ count(shape) }} images</span></div>
+              <div class="tree-row level-1" [class.selected]="selected.has(shape)" [class.included]="included(shape)"><button class="expand" (click)="toggle(shape)" [attr.aria-label]="'Expand ' + shape" [attr.aria-expanded]="expanded.has(shape)">{{ expanded.has(shape) ? '⌄' : '›' }}</button><button class="node" (click)="select(shape, $event)" [attr.aria-pressed]="selected.has(shape)">{{ shape }}</button><span class="tree-meta">{{ count(shape) }} images</span></div>
               @if (expanded.has(shape)) {
-                @for (group of groups; track group) {
-                  <div class="tree-row level-2" [class.selected]="selected === shape + '/' + group"><button class="expand" (click)="toggle(shape + '/' + group)" [attr.aria-label]="'Expand ' + shape + ' ' + group" [attr.aria-expanded]="expanded.has(shape + '/' + group)">{{ expanded.has(shape + '/' + group) ? '⌄' : '›' }}</button><button class="node" (click)="select(shape + '/' + group)">{{ group }}</button><span class="tree-meta">{{ count(shape, group) }} images</span></div>
+                @for (group of groupsOf(shape); track group) {
+                  <div class="tree-row level-2" [class.selected]="selected.has(shape + '/' + group)" [class.included]="included(shape + '/' + group)"><button class="expand" (click)="toggle(shape + '/' + group)" [attr.aria-label]="'Expand ' + shape + ' ' + group" [attr.aria-expanded]="expanded.has(shape + '/' + group)">{{ expanded.has(shape + '/' + group) ? '⌄' : '›' }}</button><button class="node" (click)="select(shape + '/' + group, $event)" [attr.aria-pressed]="selected.has(shape + '/' + group)">{{ group }}</button><span class="tree-meta">{{ count(shape, group) }} images</span></div>
                   @if (expanded.has(shape + '/' + group)) {
                     @for (imageClass of classes; track imageClass) {
                       @let path = shape + '/' + group + '/' + imageClass;
-                      <div class="tree-row level-3" [class.selected]="selected === path"><button class="expand" (click)="toggle(path)" [attr.aria-label]="'Expand ' + shape + ' ' + group + ' ' + imageClass" [attr.aria-expanded]="expanded.has(path)">{{ expanded.has(path) ? '⌄' : '›' }}</button><button class="node" (click)="select(path)">{{ imageClass }}</button><span class="tree-meta">{{ count(shape, group, imageClass) }} images</span></div>
+                      <div class="tree-row level-3" [class.selected]="selected.has(path)" [class.included]="included(path)"><button class="expand" (click)="toggle(path)" [attr.aria-label]="'Expand ' + shape + ' ' + group + ' ' + imageClass" [attr.aria-expanded]="expanded.has(path)">{{ expanded.has(path) ? '⌄' : '›' }}</button><button class="node" (click)="select(path, $event)" [attr.aria-pressed]="selected.has(path)">{{ imageClass }}</button><span class="tree-meta">{{ count(shape, group, imageClass) }} images</span></div>
                       @if (expanded.has(path)) {
                         @for (image of children(shape, group, imageClass); track image.id) {
-                          <div class="tree-row level-4"><span class="image-name">{{ image.asset?.name || image.shape + '_' + image.imageClass + '_' + image.id.toString().padStart(3, '0') + '.png' }}</span><button class="load-image" [disabled]="busy" (click)="useImage(image)" [attr.aria-label]="'Load image ' + image.id">Load image ↗</button></div>
+                          <div class="tree-row level-4"><span class="image-name">{{ name(image) }}</span><button class="load-image" [disabled]="busy" (click)="useImage(image)" [attr.aria-label]="'Load image ' + image.id">Load image ↗</button></div>
                         }
                       }
                     }
@@ -28,10 +28,11 @@
               }
             }
           }
-          @if (!images.length) { <div class="tree-empty">Add images to begin.<button (click)="restoreSamples()">Load sample dataset</button></div> }
+          @if (!images.length) { <div class="tree-empty">Add images to begin.<button [disabled]="busy" (click)="restoreSamples()">{{ folder ? 'Generate sample dataset' : 'Load sample dataset' }}</button></div> }
         </div>
         <div class="scope-summary"><span>Selected for training:</span><strong>{{ scopeName }} · {{ scope.length }} images</strong></div>
-        <div class="dataset-foot"><span>Total: {{ images.length }} images</span></div>
+        @if (folder && missingSamples && !generating && images.length) { <div class="restore-samples"><span>{{ missingSamples }} generated {{ missingSamples === 1 ? 'image is' : 'images are' }} missing from the folder.</span><button class="quiet" [disabled]="busy" (click)="restoreSamples()">Restore {{ missingSamples === 1 ? 'it' : 'them' }}</button></div> }
+        <div class="dataset-foot"><span [title]="folder || 'Start with npm start to keep the dataset in a folder'">Total: {{ images.length }} images · {{ generating ? 'writing ' + written + ' / 5000 to folder' : folder ? 'dataset folder, watched' : 'in memory' }}</span><span>Ctrl / ⌘ + click to select several folders</span></div>
       </section>
 
       <section class="panel training">
@@ -59,53 +60,52 @@
           <div class="result-summary" aria-live="polite"><strong [class.defective]="result.classification === 'Defective'">{{ result.classification }}</strong><span>Confidence: {{ result.confidence * 100 | number:'1.1-1' }}%</span>@if (result.localizationStatus !== 'failed') { <span class="region-count">Detected regions: {{ result.defects.length }}</span> }</div>
           @if (result.localizationStatus === 'failed') { <div class="localization-error" role="alert">Defect detected, but localization failed</div> }
         }
-        <div class="inspection" [class.grid-only]="result?.classification === 'Clean'">
-          @if (!result || result.classification === 'Defective') {
-            <div class="image-card"><div class="image-title"><h3>Defect Preview</h3>@if (defect) { <span class="micro">REGION {{ defect.index }}</span> }</div>
-              <div class="preview image-view">
-                @if (inputImage && result) {
-                  <svg class="region-preview" [attr.viewBox]="'0 0 ' + inputImage.width + ' ' + inputImage.height" role="img" [attr.aria-label]="defect ? 'Input image with defect ' + defect.index + ' highlighted' : 'Input image; localization unavailable'">
-                    <image [attr.href]="inputImage.url" [attr.width]="inputImage.width" [attr.height]="inputImage.height" />
-                    @for (region of result.defects; track region.index) {
-                      <rect class="region-outline" [class.current]="region.index === defect?.index" [attr.x]="region.bounds.x" [attr.y]="region.bounds.y" [attr.width]="region.bounds.width" [attr.height]="region.bounds.height" vector-effect="non-scaling-stroke" />
-                    }
-                    @if (defect) {
-                      <rect class="region-label-bg" [attr.x]="defect.bounds.x" [attr.y]="defect.bounds.y" [attr.width]="inputImage.width * .07" [attr.height]="inputImage.height * .055" />
-                      <text class="region-label" [attr.x]="defect.bounds.x + inputImage.width * .035" [attr.y]="defect.bounds.y + inputImage.height * .039" [attr.font-size]="inputImage.height * .037">{{ defect.index }}</text>
-                    }
-                  </svg>
-                } @else { <div class="empty-inspection"><span>No defect selected</span></div> }
-              </div>
-              @if (defect) { <div class="image-caption">{{ defect.cells.length }} {{ defect.cells.length === 1 ? 'cell' : 'cells' }} selected · X {{ defect.bounds.x }} / Y {{ defect.bounds.y }}</div> }
+        <div class="inspection">
+          <div class="image-card"><div class="image-title"><h3>Defect Preview</h3>@if (defect) { <span class="micro">REGION {{ defect.index }}</span> }</div>
+            <div class="preview image-view">
+              @if (inputImage && result) {
+                <svg class="region-preview" [attr.viewBox]="'0 0 ' + inputImage.width + ' ' + inputImage.height" role="img" [attr.aria-label]="view + ' layer' + (defect ? ' with defect ' + defect.index + ' highlighted' : '')">
+                  <image [attr.href]="previewUrl" [attr.width]="inputImage.width" [attr.height]="inputImage.height" preserveAspectRatio="none" />
+                  @for (region of result.defects; track region.index) {
+                    <rect class="region-outline" [class.current]="region.index === defect?.index" [attr.x]="region.bounds.x" [attr.y]="region.bounds.y" [attr.width]="region.bounds.width" [attr.height]="region.bounds.height" vector-effect="non-scaling-stroke" />
+                  }
+                  @if (defect) {
+                    <rect class="region-label-bg" [attr.x]="defect.bounds.x" [attr.y]="defect.bounds.y" [attr.width]="inputImage.width * .07" [attr.height]="inputImage.height * .055" />
+                    <text class="region-label" [attr.x]="defect.bounds.x + inputImage.width * .035" [attr.y]="defect.bounds.y + inputImage.height * .039" [attr.font-size]="inputImage.height * .037">{{ defect.index }}</text>
+                  }
+                </svg>
+              } @else { <div class="empty-inspection"><span>No defect selected</span></div> }
             </div>
-          }
-          <div class="image-card"><div class="image-title"><h3>Intensity Grid</h3><span class="micro">10 × 10</span></div><div class="grid-view image-view">
+            <div class="view-switch" role="group" aria-label="Preview layer">@for (option of views; track option) { <button [class.active]="view === option" [attr.aria-pressed]="view === option" [disabled]="!result" (click)="view = option">{{ option }}</button> }</div>
+            @if (result) { <div class="image-caption" [title]="view === 'Reference' ? result.referenceMethod : caption"><span>{{ caption }}</span></div> }
+          </div>
+          <div class="image-card"><div class="image-title"><h3>Intensity Grid</h3><span class="micro">{{ gridSize }} × {{ gridSize }} · input − reference</span></div><div class="grid-view image-view">
             @if (result) {
-              <div class="intensity-grid">@for (value of result.grid; track $index) { <button class="intensity-cell" [class.highlighted]="defect?.cells?.includes($index)" [class.suspicious]="isSuspicious($index)" [style.background]="cellColor(value, $index)" (click)="selectCell($index)" [disabled]="!isSuspicious($index)" [attr.aria-label]="'Row ' + (1 + ($index - $index % 10) / 10) + ', column ' + (1 + $index % 10) + ', intensity ' + value.toFixed(3)" [attr.aria-pressed]="defect?.cells?.includes($index) || false" [title]="'Row ' + (1 + ($index - $index % 10) / 10) + ', column ' + (1 + $index % 10) + ': ' + value.toFixed(4)">{{ value | number:'1.2-2' }}</button> }</div>
+              <div class="intensity-grid">@for (value of result.grid; track $index) { <button class="intensity-cell" [class.highlighted]="defect?.cells?.includes($index)" [class.suspicious]="isSuspicious($index)" [style.background]="cellColor(value, $index)" (click)="selectCell($index)" [disabled]="!isSuspicious($index)" [attr.aria-label]="'Row ' + (1 + ($index - $index % gridSize) / gridSize) + ', column ' + (1 + $index % gridSize) + ', mean difference ' + value.toFixed(3)" [attr.aria-pressed]="defect?.cells?.includes($index) || false" [title]="'Row ' + (1 + ($index - $index % gridSize) / gridSize) + ', column ' + (1 + $index % gridSize) + ': ' + value.toFixed(4)"></button> }</div>
             } @else { <div class="empty-grid"><div class="grid-illustration"></div><span>Processed intensity grid will appear here after recognition</span></div> }
-          </div><div class="scale"><span>0.0 Black</span><div></div><span>1.0 White</span></div></div>
+          </div><div class="scale diverging"><span>Darker</span><div></div><span>Brighter than reference</span></div></div>
         </div>
         @if (defect) {
           <div class="metrics defect-metrics localized-metrics">
             <div><span>Location</span><strong>{{ location('x') }}, {{ location('y') }}</strong><small>px</small></div>
             <div><span>Grid Cell</span><strong>R{{ defect.row }} · C{{ defect.col }}</strong><small>{{ defect.cells.length }} {{ defect.cells.length === 1 ? 'cell' : 'cells' }}</small></div>
             <div><span>Region Size</span><strong>{{ defect.bounds.width }} × {{ defect.bounds.height }}</strong><small>px</small></div>
-            <div><span>Intensity</span><strong>{{ defect.intensity | number:'1.3-3' }}</strong><small>average</small></div>
+            <div><span title="Mean of input − reference over the region cells">Intensity</span><strong>{{ defect.intensity | number:'1.3-3' }}</strong><small>avg difference</small></div>
             <div><span title="Region anomaly score relative to the learned clean pattern; not a calibrated probability">Anomaly Score</span><strong>{{ defect.anomalyScore * 100 | number:'1.1-1' }}%</strong><small>region</small></div>
           </div>
         }
         <div class="export-row"><label>Format:<select [(ngModel)]="format"><option>PNG</option><option>JPG</option><option>BMP</option></select></label><button [disabled]="!result || busy" (click)="saveImage()">↓ Save Image</button><button class="primary" [disabled]="!result || busy" (click)="saveResult()">↓ Save Result</button></div>
       </section>
-      <section class="panel operation"><div class="panel-heading"><h2>Operation Log</h2><div class="log-controls"><label><input type="checkbox" [(ngModel)]="autoScroll">Auto-Scroll</label><button class="quiet" (click)="logs = []">Clear</button></div></div><div id="log-lines" class="log-lines" role="log" aria-live="polite">@for (line of logs; track $index) { <div [class]="line.kind"><time>{{ line.time }}</time><span>{{ line.text }}</span></div> }@if (!logs.length) { <div class="muted">No operations logged.</div> }</div></section>
+      <section class="panel operation"><div class="panel-heading"><h2>Operation Log</h2><div class="log-controls"><label><input type="checkbox" [(ngModel)]="autoScroll">Auto-Scroll</label><button class="quiet" [disabled]="!logs.length" (click)="saveLog()" title="Save the log as a text file">Save</button><button class="quiet" (click)="logs = []">Clear</button></div></div><div id="log-lines" class="log-lines" role="log" aria-live="polite">@for (line of logs; track $index) { <div [class]="line.kind"><time>{{ line.time }}</time><span>{{ line.text }}</span></div> }@if (!logs.length) { <div class="muted">No operations logged.</div> }</div></section>
     </div>
   </main>
 </div>
 <input #imageInput type="file" accept=".png,.jpg,.jpeg,.bmp" hidden (change)="upload($event, 'recognition')"><input #datasetInput type="file" accept=".png,.jpg,.jpeg,.bmp" multiple hidden (change)="upload($event, 'dataset')">
 @if (modal) {
   <div class="modal-backdrop" (click)="modal = ''"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title" (click)="$event.stopPropagation()"><button class="modal-close" (click)="modal = ''" aria-label="Close dialog">×</button>
-    @if (modal === 'shape') { <h2 id="dialog-title">Add Shape</h2><label>Shape name<input autofocus [(ngModel)]="shapeName" placeholder="e.g. Triangle" (keydown.enter)="addShape()"></label><button class="primary" [disabled]="!shapeName.trim() || shapes.includes(shapeName.trim()) || shapeName.includes('/')" (click)="addShape()">Add Shape</button> }
+    @if (modal === 'shape') { <h2 id="dialog-title">Add Shape</h2><label>Shape name<input autofocus [(ngModel)]="shapeName" placeholder="e.g. Triangle" (keydown.enter)="addShape()"></label><button class="primary" [disabled]="!validShape(shapeName)" (click)="addShape()">Add Shape</button> }
     @if (modal === 'images') { <h2 id="dialog-title">Add Images</h2><label>Shape<select [(ngModel)]="uploadShape">@for (shape of shapes; track shape) { <option>{{ shape }}</option> }</select></label><label>Quality group<select [(ngModel)]="uploadGroup">@for (group of groups; track group) { <option>{{ group }}</option> }</select></label><label>Image class<select [(ngModel)]="imageClass"><option>Clean</option><option>Defective</option></select></label><button class="primary" (click)="datasetInput.click()">Choose images</button> }
-    @if (modal === 'clear') { <h2 id="dialog-title">Clear dataset?</h2><p>Remove all {{ images.length }} images from this session. Uploaded source files will stay on your device.</p><button class="primary" (click)="clearDataset()">Clear dataset</button> }
-    @if (modal === 'info' && info) { <h2 id="dialog-title">Image Information</h2><dl><dt>File name</dt><dd>{{ info.name }}</dd><dt>Extension</dt><dd>{{ info.name.split('.').pop()?.toUpperCase() }}</dd><dt>File size</dt><dd>{{ info.size / 1024 | number:'1.1-1' }} KB</dd><dt>Width</dt><dd>{{ info.width }} px</dd><dt>Height</dt><dd>{{ info.height }} px</dd></dl> }
+    @if (modal === 'clear') { <h2 id="dialog-title">Clear selected folders?</h2>@if (folder) { <p>Move {{ scope.length }} images in {{ scopeName }} to {{ trash }}. They can be restored from there.</p> } @else { <p>Remove {{ scope.length }} images in {{ scopeName }} from this session. Uploaded source files will stay on your device.</p> }<button class="primary" (click)="clearDataset()">Clear {{ scope.length }} images</button> }
+     @if (modal === 'info' && info) { <h2 id="dialog-title">Image Information</h2><dl><dt>File name</dt><dd>{{ info.name }}</dd><dt>Extension</dt><dd>{{ info.name.split('.').pop()?.toUpperCase() }}</dd><dt>File size</dt><dd>{{ info.size / 1024 | number:'1.1-1' }} KB</dd><dt>Width</dt><dd>{{ info.width }} px</dd><dt>Height</dt><dd>{{ info.height }} px</dd></dl> }
   </section></div>
 }
